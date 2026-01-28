@@ -6,7 +6,7 @@ from datetime import datetime
 # ============================================================================
 # KONFIGURATION - Hier musst du später deinen API-Key eintragen!
 # ============================================================================
-API_KEY = st.secrets.get("FOOTBALL_API_KEY", "DEIN_API_KEY_HIER")
+API_KEY = st.secrets.get("FOOTBALL_API_KEY", "c1714469c0374ef4819fc9375a27269f")
 NTFY_TOPIC = "champions-league-goals"  # Du kannst das ändern!
 
 # API Endpoints
