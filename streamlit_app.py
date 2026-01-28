@@ -28,6 +28,8 @@ def load_custom_css():
         padding-top: 1rem !important;
         padding-bottom: 0rem !important;
         max-width: 100% !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
     
     /* NO-WRAP RULE - Zwingt Spalten nebeneinander */
@@ -35,7 +37,7 @@ def load_custom_css():
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 5px !important;
+        gap: 3px !important;
         overflow-x: auto !important;
     }
     
@@ -54,14 +56,14 @@ def load_custom_css():
         max-width: 67% !important;
     }
 
-    /* Match Cards mit Logos */
+    /* Match Cards - kompakter */
     .match-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border-radius: 8px;
-        padding: 8px;
-        margin-bottom: 6px;
+        border-radius: 6px;
+        padding: 6px;
+        margin-bottom: 4px;
         text-align: center;
-        border-left: 3px solid #3b82f6;
+        border-left: 2px solid #3b82f6;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
@@ -69,18 +71,18 @@ def load_custom_css():
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        margin: 3px 0;
+        gap: 4px;
+        margin: 2px 0;
     }
     
     .team-logo {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
         object-fit: contain;
     }
     
     .team-name { 
-        font-size: 10px; 
+        font-size: 9px; 
         color: white; 
         white-space: nowrap; 
         overflow: hidden; 
@@ -90,53 +92,46 @@ def load_custom_css():
     }
     
     .score { 
-        font-size: 16px; 
+        font-size: 14px; 
         font-weight: bold; 
         color: #fbbf24; 
-        margin: 6px 0;
+        margin: 4px 0;
         text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
     }
     
     .match-time { 
-        font-size: 10px; 
+        font-size: 9px; 
         color: #94a3b8; 
         background: #334155;
-        padding: 3px 8px;
+        padding: 2px 6px;
         border-radius: 4px;
         display: inline-block;
     }
     
-    /* Streamlit Dataframe Styling */
-    [data-testid="stDataFrame"] {
-        width: 100% !important;
+    /* Streamlit Expander - kompakter */
+    [data-testid="stExpander"] {
+        border: none !important;
+        margin-bottom: 3px !important;
     }
     
-    .stDataFrame > div {
-        width: 100% !important;
+    [data-testid="stExpanderDetails"] {
+        padding: 4px !important;
     }
     
-    /* Streamlit Table Cells */
-    [data-testid="stDataFrame"] td,
-    [data-testid="stDataFrame"] th {
-        font-size: 9px !important;
-        padding: 4px 2px !important;
-        text-align: center !important;
-    }
-    
-    /* Header */
+    /* Header - kompakter */
     h1 { 
-        font-size: 16px !important; 
-        margin: 8px 0 !important; 
+        font-size: 15px !important; 
+        margin: 6px 0 !important; 
+        padding: 6px !important;
         color: white;
         text-align: center;
         background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        padding: 8px;
-        border-radius: 8px;
+        border-radius: 6px;
     }
     
     h2 { 
-        font-size: 12px !important; 
-        margin: 6px 0 !important; 
+        font-size: 11px !important; 
+        margin: 4px 0 !important; 
         color: #94a3b8;
         text-align: center;
     }
@@ -146,8 +141,8 @@ def load_custom_css():
     
     /* Scrollbar */
     ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px;
+        height: 4px;
     }
     
     ::-webkit-scrollbar-track {
@@ -156,7 +151,7 @@ def load_custom_css():
     
     ::-webkit-scrollbar-thumb {
         background: #3b82f6;
-        border-radius: 3px;
+        border-radius: 2px;
     }
     </style>
     """, unsafe_allow_html=True)
