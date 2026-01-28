@@ -12,46 +12,49 @@ MATCHES_URL = "https://api.football-data.org/v4/competitions/CL/matches"
 STANDINGS_URL = "https://api.football-data.org/v4/competitions/CL/standings"
 
 # ============================================================================
-# CSS FÜR S24 ULTRA - OPTIMIERT
+# CSS FÜR S24 ULTRA - NO-WRAP ERZWUNGEN
 # ============================================================================
 def load_custom_css():
     st.markdown("""
     <style>
-    /* App-Container ohne Padding oben */
+    /* Basis */
     .stApp { 
         max-width: 100%; 
         padding: 0rem !important; 
         background-color: #0e1117;
-        margin-top: -80px !important;
     }
     
-    /* Entfernt Streamlit Header Spacing */
     .block-container {
-        padding-top: 0rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 0rem !important;
+        max-width: 100% !important;
     }
     
-    /* Spalten-Layout: Links 33%, Rechts 67% */
+    /* NO-WRAP RULE - Zwingt Spalten nebeneinander */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 5px !important;
+        overflow-x: auto !important;
+    }
+    
+    /* Spalten: Links 33%, Rechts 67% */
     [data-testid="column"]:first-child {
         width: 33% !important;
         flex: 0 0 33% !important;
         min-width: 33% !important;
+        max-width: 33% !important;
     }
     
     [data-testid="column"]:last-child {
         width: 67% !important;
         flex: 0 0 67% !important;
         min-width: 67% !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 4px !important;
+        max-width: 67% !important;
     }
 
-    /* Match Cards mit Team-Logos */
+    /* Match Cards mit Logos */
     .match-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border-radius: 8px;
@@ -103,60 +106,21 @@ def load_custom_css():
         display: inline-block;
     }
     
-    /* Tabellen-Styling */
-    .standings-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 10px;
-        color: white;
-        background: #1e293b;
-        border-radius: 8px;
-        overflow: hidden;
+    /* Streamlit Dataframe Styling */
+    [data-testid="stDataFrame"] {
+        width: 100% !important;
     }
     
-    .standings-table th {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        padding: 8px 4px;
-        text-align: center;
-        font-weight: bold;
-        font-size: 10px;
-        position: sticky;
-        top: 0;
-        z-index: 10;
+    .stDataFrame > div {
+        width: 100% !important;
     }
     
-    .standings-table td {
-        padding: 6px 4px;
-        border-bottom: 1px solid #334155;
-        text-align: center;
-    }
-    
-    .standings-table tr:hover {
-        background: #334155;
-    }
-    
-    .pos-cell {
-        color: #3b82f6;
-        font-weight: bold;
-        font-size: 11px;
-    }
-    
-    .team-cell {
-        text-align: left !important;
-        padding-left: 8px !important;
-    }
-    
-    .gd-positive {
-        color: #10b981;
-    }
-    
-    .gd-negative {
-        color: #ef4444;
-    }
-    
-    .gd-neutral {
-        color: #94a3b8;
+    /* Streamlit Table Cells */
+    [data-testid="stDataFrame"] td,
+    [data-testid="stDataFrame"] th {
+        font-size: 9px !important;
+        padding: 4px 2px !important;
+        text-align: center !important;
     }
     
     /* Header */
@@ -180,9 +144,10 @@ def load_custom_css():
     /* Versteckt Streamlit Branding */
     #MainMenu, footer, header { visibility: hidden; }
     
-    /* Scrollbar Styling */
+    /* Scrollbar */
     ::-webkit-scrollbar {
         width: 6px;
+        height: 6px;
     }
     
     ::-webkit-scrollbar-track {
@@ -206,42 +171,84 @@ def get_api_data(url):
     except: 
         return None
 
+def get_match_details(match_id):
+    """Lädt Details für ein einzelnes Spiel"""
+    url = f"https://api.football-data.org/v4/matches/{match_id}"
+    return get_api_data(url)
+
+def display_match_details(match_id):
+    """Zeigt Spielverlauf: Tore, Karten, Auswechslungen"""
+    details = get_match_details(match_id)
+    
+    if not details:
+        st.markdown('<div style="color: #ef4444; font-size: 9px;">⚠️ Details nicht verfügbar</div>', unsafe_allow_html=True)
+        return
+    
+    # Tore
+    goals = details.get('goals', [])
+    if goals:
+        st.markdown("**⚽ TORE:**")
+        for g in goals:
+            minute = g.get('minute', '?')
+            scorer = g.get('scorer', {}).get('name', 'Unbekannt')
+            team = g.get('team', {}).get('shortName') or g.get('team', {}).get('name', '')[:10]
+            st.markdown(f"<div style='font-size: 9px; color: #10b981;'>{minute}' ⚽ {scorer} ({team})</div>", unsafe_allow_html=True)
+    
+    # Karten
+    bookings = details.get('bookings', [])
+    if bookings:
+        st.markdown("**🟨 KARTEN:**")
+        for b in bookings:
+            minute = b.get('minute', '?')
+            player = b.get('player', {}).get('name', 'Unbekannt')
+            team = b.get('team', {}).get('shortName') or b.get('team', {}).get('name', '')[:10]
+            card = b.get('card', 'YELLOW')
+            icon = '🟥' if card == 'RED' else '🟨'
+            color = '#ef4444' if card == 'RED' else '#fbbf24'
+            st.markdown(f"<div style='font-size: 9px; color: {color};'>{minute}' {icon} {player} ({team})</div>", unsafe_allow_html=True)
+    
+    # Auswechslungen
+    substitutions = details.get('substitutions', [])
+    if substitutions:
+        st.markdown("**🔄 WECHSEL:**")
+        for s in substitutions:
+            minute = s.get('minute', '?')
+            player_out = s.get('playerOut', {}).get('name', 'Unbekannt')
+            player_in = s.get('playerIn', {}).get('name', 'Unbekannt')
+            team = s.get('team', {}).get('shortName') or s.get('team', {}).get('name', '')[:10]
+            st.markdown(f"<div style='font-size: 9px; color: #94a3b8;'>{minute}' 🔄 {player_out} ➡️ {player_in} ({team})</div>", unsafe_allow_html=True)
+    
+    if not goals and not bookings and not substitutions:
+        st.markdown('<div style="color: #94a3b8; font-size: 9px;">Noch keine Ereignisse</div>', unsafe_allow_html=True)
+
 def display_matches(data):
     if not data or 'matches' not in data: 
-        st.markdown('<div style="color: #94a3b8; text-align: center; padding: 20px;">Keine Spiele verfügbar</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color: #94a3b8; text-align: center; padding: 20px;">Keine Daten</div>', unsafe_allow_html=True)
         return
     
     today = datetime.now().date()
     matches_shown = 0
     
     for m in data['matches']:
-        # Korrektur der Zeitzone (UTC+1)
+        # UTC+1 Korrektur
         utc_time = datetime.strptime(m['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
         local_time = utc_time + timedelta(hours=1)
         
         if local_time.date() == today or m['status'] == 'IN_PLAY':
             home_name = m['homeTeam']['shortName'] or m['homeTeam']['name'][:12]
             away_name = m['awayTeam']['shortName'] or m['awayTeam']['name'][:12]
-            home_logo = m['homeTeam'].get('crest', '')
-            away_logo = m['awayTeam'].get('crest', '')
+            match_id = m['id']
             
-            # Live-Spiel oder geplantes Spiel
             if m['status'] == 'IN_PLAY':
-                score_html = f'<div class="score">{m["score"]["fullTime"]["home"]} : {m["score"]["fullTime"]["away"]}</div>'
+                score = f"{m['score']['fullTime']['home']}:{m['score']['fullTime']['away']}"
+                label = f"⚽ {home_name} {score} {away_name}"
             else:
-                score_html = f'<div class="match-time">⏰ {local_time.strftime("%H:%M")}</div>'
+                time_str = local_time.strftime("%H:%M")
+                label = f"⏰ {time_str} | {home_name} vs {away_name}"
             
-            # Team-Zeilen mit Logos
-            home_html = f'<div class="team-row"><img src="{home_logo}" class="team-logo" onerror="this.style.display=\'none\'"><div class="team-name">{home_name}</div></div>'
-            away_html = f'<div class="team-row"><img src="{away_logo}" class="team-logo" onerror="this.style.display=\'none\'"><div class="team-name">{away_name}</div></div>'
-            
-            st.markdown(f'''
-            <div class="match-card">
-                {home_html}
-                {score_html}
-                {away_html}
-            </div>
-            ''', unsafe_allow_html=True)
+            # Expander mit Match-Details
+            with st.expander(label, expanded=False):
+                display_match_details(match_id)
             
             matches_shown += 1
     
@@ -250,52 +257,41 @@ def display_matches(data):
 
 def display_standings(data):
     if not data or 'standings' not in data: 
-        st.markdown('<div style="color: #94a3b8; text-align: center; padding: 20px;">Tabelle nicht verfügbar</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color: #94a3b8; text-align: center; padding: 20px;">Keine Daten</div>', unsafe_allow_html=True)
         return
     
     table = data['standings'][0]['table']
     
-    # HTML-Tabelle mit Tordifferenz
-    html = '<table class="standings-table">'
-    html += '''
-    <thead>
-        <tr>
-            <th>#</th>
-            <th style="text-align:left; padding-left:8px;">Team</th>
-            <th>TD</th>
-            <th>P</th>
-        </tr>
-    </thead>
-    <tbody>
-    '''
-    
+    # Erstelle kompakte Tabellen-Zeilen ohne HTML
     for e in table:
+        pos = e['position']
         name = e['team']['shortName'] or e['team']['name']
-        name = (name[:10] + '..') if len(name) > 11 else name
+        name = name[:10] + '..' if len(name) > 11 else name
         
-        # Tordifferenz berechnen und einfärben
-        goal_diff = e['goalsFor'] - e['goalsAgainst']
-        if goal_diff > 0:
-            gd_class = "gd-positive"
-            gd_text = f"+{goal_diff}"
-        elif goal_diff < 0:
-            gd_class = "gd-negative"
-            gd_text = str(goal_diff)
-        else:
-            gd_class = "gd-neutral"
-            gd_text = "0"
+        gd = e['goalsFor'] - e['goalsAgainst']
+        gd_text = f"+{gd}" if gd > 0 else str(gd)
+        gd_color = "#10b981" if gd > 0 else ("#ef4444" if gd < 0 else "#94a3b8")
         
-        html += f'''
-        <tr>
-            <td class="pos-cell">{e["position"]}</td>
-            <td class="team-cell">{name}</td>
-            <td class="{gd_class}">{gd_text}</td>
-            <td style="font-weight:bold; color:#fbbf24;">{e["points"]}</td>
-        </tr>
-        '''
-    
-    html += '</tbody></table>'
-    st.markdown(html, unsafe_allow_html=True)
+        pts = e['points']
+        
+        # Kompakte Zeile als HTML
+        st.markdown(f'''
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            margin: 2px 0;
+            background: #1e293b;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        ">
+            <span style="color: #3b82f6; font-weight: bold; font-size: 10px; width: 15%;">{pos}</span>
+            <span style="color: white; font-size: 9px; text-align: left; flex: 1;">{name}</span>
+            <span style="color: {gd_color}; font-size: 9px; width: 20%; text-align: center;">{gd_text}</span>
+            <span style="color: #fbbf24; font-weight: bold; font-size: 10px; width: 15%; text-align: right;">{pts}</span>
+        </div>
+        ''', unsafe_allow_html=True)
 
 # ============================================================================
 # MAIN APP
@@ -310,14 +306,12 @@ def main():
     
     load_custom_css()
     
-    # Kompakter Header
-    st.markdown("# ⚽ Champions League LIVE")
+    st.markdown("# ⚽ CL LIVE")
     
-    # Daten laden
     m_data = get_api_data(MATCHES_URL)
     s_data = get_api_data(STANDINGS_URL)
     
-    # Spalten: Links 33%, Rechts 67%
+    # Spalten: 33% und 67%
     col1, col2 = st.columns([1, 2])
     
     with col1:
@@ -328,7 +322,6 @@ def main():
         st.markdown("## 📊 Tabelle")
         display_standings(s_data)
 
-    # Auto-Refresh
     time.sleep(30)
     st.rerun()
 
