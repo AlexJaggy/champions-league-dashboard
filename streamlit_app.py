@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import time
 from datetime import datetime
-import pandas as pd
 
 # ============================================================================
 # KONFIGURATION - Hier musst du später deinen API-Key eintragen!
@@ -251,7 +250,7 @@ def display_matches(matches_data):
 
 def display_standings(standings_data):
     """
-    Zeigt die Gruppentabelle an
+    Zeigt die Gruppentabelle an (ohne Pandas)
     """
     if not standings_data or 'standings' not in standings_data:
         st.error("❌ Keine Tabellendaten verfügbar")
@@ -266,29 +265,77 @@ def display_standings(standings_data):
     # Nehme die erste Tabelle (Gesamttabelle)
     table = standings[0]['table']
     
-    # Erstelle DataFrame
-    df_data = []
+    # Erstelle HTML Tabelle
+    html = """
+    <style>
+    .standings-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .standings-table th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 4px;
+        text-align: left;
+        font-weight: bold;
+    }
+    .standings-table td {
+        padding: 6px 4px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .standings-table tr:hover {
+        background: #f3f4f6;
+    }
+    .pos {
+        font-weight: bold;
+        color: #667eea;
+    }
+    </style>
+    <table class="standings-table">
+    <thead>
+        <tr>
+            <th>Pos</th>
+            <th>Team</th>
+            <th>Sp</th>
+            <th>S</th>
+            <th>U</th>
+            <th>N</th>
+            <th>Tore</th>
+            <th>Pkt</th>
+        </tr>
+    </thead>
+    <tbody>
+    """
+    
     for entry in table:
-        df_data.append({
-            'Pos': entry['position'],
-            'Team': entry['team']['name'][:20],  # Kürze Namen
-            'Sp': entry['playedGames'],
-            'S': entry['won'],
-            'U': entry['draw'],
-            'N': entry['lost'],
-            'Tore': f"{entry['goalsFor']}:{entry['goalsAgainst']}",
-            'Pkt': entry['points']
-        })
+        team_name = entry['team']['name']
+        # Kürze lange Namen
+        if len(team_name) > 20:
+            team_name = team_name[:17] + "..."
+        
+        html += f"""
+        <tr>
+            <td class="pos">{entry['position']}</td>
+            <td>{team_name}</td>
+            <td>{entry['playedGames']}</td>
+            <td>{entry['won']}</td>
+            <td>{entry['draw']}</td>
+            <td>{entry['lost']}</td>
+            <td>{entry['goalsFor']}:{entry['goalsAgainst']}</td>
+            <td><strong>{entry['points']}</strong></td>
+        </tr>
+        """
     
-    df = pd.DataFrame(df_data)
+    html += """
+    </tbody>
+    </table>
+    """
     
-    # Zeige Tabelle an
-    st.dataframe(
-        df,
-        hide_index=True,
-        use_container_width=True,
-        height=600
-    )
+    st.markdown(html, unsafe_allow_html=True)
 
 # ============================================================================
 # HAUPTPROGRAMM
