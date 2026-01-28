@@ -1,111 +1,67 @@
 import streamlit as st
 import requests
 import time
-import os  # <--- NEU: Wichtig für Render Environment Variables
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 
 # ============================================================================
 # KONFIGURATION
 # ============================================================================
-
-# 1. Versuche Key aus Render Environment Variables zu laden
 API_KEY = os.environ.get("FOOTBALL_API_KEY")
-
-# 2. Falls nicht vorhanden (z.B. lokal), versuche st.secrets oder Fallback
 if not API_KEY:
     try:
-        # Versuche secrets.toml (für lokale Entwicklung)
         API_KEY = st.secrets["FOOTBALL_API_KEY"]
     except (FileNotFoundError, KeyError):
-        # Letzter Ausweg: Der Hardcoded Key aus deinem Original-Code
         API_KEY = "c1714469c0374ef4819fc9375a27269f"
 
-NTFY_TOPIC = "champions-league-goals"  # Du kannst das ändern!
+NTFY_TOPIC = "champions-league-goals"
 
 # API Endpoints
 MATCHES_URL = "https://api.football-data.org/v4/competitions/CL/matches"
 STANDINGS_URL = "https://api.football-data.org/v4/competitions/CL/standings"
 
 # ============================================================================
-# CUSTOM CSS FÜR SAMSUNG GALAXY S24 ULTRA
+# CUSTOM CSS FÜR S24 ULTRA (NEBENEINANDER ERZWINGEN)
 # ============================================================================
 def load_custom_css():
     st.markdown("""
     <style>
-    /* Basis-Styling */
-    .stApp {
-        max-width: 100%;
-        padding: 0.5rem;
+    /* Hauptcontainer für Handy optimieren */
+    .stApp { max-width: 100%; padding: 0.2rem; }
+    
+    /* Erzwingt nebeneinander Darstellung auch auf schmalen Bildschirmen */
+    [data-testid="column"] {
+        width: 49% !important;
+        flex: 1 1 49% !important;
+        min-width: 49% !important;
     }
     
-    /* Split-Screen Layout - WICHTIG: Verhindert Umbruch! */
-    .split-container {
+    div[data-testid="stHorizontalBlock"] {
         display: flex;
-        gap: 10px;
-        overflow-x: auto;
-        min-width: 100%;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 5px;
     }
-    
-    .split-column {
-        flex: 1;
-        min-width: 48%;
-        max-width: 50%;
-    }
-    
-    /* Tabellen-Styling */
+
+    /* Match Cards kompakter */
     .match-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 10px;
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 6px;
         color: white;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .live-badge {
-        background: #ff4444;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 5px;
-        font-size: 11px;
-        font-weight: bold;
-        animation: pulse 1.5s infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-    
-    .score {
-        font-size: 24px;
-        font-weight: bold;
         text-align: center;
+        border-left: 3px solid #667eea;
     }
     
-    .team-name {
-        font-size: 14px;
-        margin: 5px 0;
-    }
+    .team-name { font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .score { font-size: 18px; font-weight: bold; margin: 2px 0; color: #fbbf24; }
+    .match-time { font-size: 10px; color: #a0aec0; }
     
-    /* Tabelle */
-    .standings-table {
-        font-size: 12px;
-        width: 100%;
-    }
-    
-    /* Header */
-    h1 {
-        font-size: 20px !important;
-        margin-bottom: 10px !important;
-    }
-    
-    h2 {
-        font-size: 16px !important;
-        margin-top: 5px !important;
-    }
-    
-    /* Streamlit Button verstecken */
+    h1 { font-size: 18px !important; }
+    h2 { font-size: 14px !important; margin-bottom: 10px !important; }
+
+    /* UI Elemente verstecken */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -113,305 +69,98 @@ def load_custom_css():
     """, unsafe_allow_html=True)
 
 # ============================================================================
-# FUNKTIONEN MIT ERROR-HANDLING
+# FUNKTIONEN
 # ============================================================================
 
-def get_api_data(url, max_retries=3):
-    """
-    Holt Daten von der API mit automatischen Wiederholungen
-    """
+def get_api_data(url):
     headers = {"X-Auth-Token": API_KEY}
-    
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 429:
-                # Rate Limit erreicht
-                st.warning("⏱️ Zu viele Anfragen. Warte 60 Sekunden...")
-                time.sleep(60)
-            else:
-                st.error(f"API Fehler: {response.status_code}")
-                return None
-                
-        except requests.exceptions.Timeout:
-            st.warning(f"⏱️ Timeout - Versuch {attempt + 1}/{max_retries}")
-            time.sleep(2)
-        except requests.exceptions.ConnectionError:
-            st.warning(f"📡 Keine Internetverbindung - Versuch {attempt + 1}/{max_retries}")
-            time.sleep(5)
-        except Exception as e:
-            st.error(f"❌ Unerwarteter Fehler: {str(e)}")
-            return None
-    
-    st.error("❌ Konnte keine Daten laden nach mehreren Versuchen")
-    return None
-
-def send_goal_notification(home_team, away_team, score):
-    """
-    Sendet Push-Benachrichtigung über ntfy.sh
-    """
     try:
-        message = f"⚽ TOR! {home_team} {score} {away_team}"
-        requests.post(
-            f"https://ntfy.sh/{NTFY_TOPIC}",
-            data=message.encode('utf-8'),
-            headers={
-                "Title": "Champions League LIVE",
-                "Priority": "high",
-                "Tags": "soccer"
-            },
-            timeout=5
-        )
-    except Exception as e:
-        # Fehler bei Benachrichtigung nicht anzeigen, um Dashboard nicht zu stören
-        pass
-
-def check_for_goals(current_matches, previous_matches):
-    """
-    Vergleicht aktuelle Spielstände mit vorherigen und sendet Benachrichtigungen
-    """
-    if not previous_matches:
-        return
-    
-    for current in current_matches:
-        match_id = current['id']
-        
-        # Finde vorheriges Spiel
-        previous = next((m for m in previous_matches if m['id'] == match_id), None)
-        
-        if previous and current['status'] == 'IN_PLAY':
-            current_score = current['score']['fullTime']
-            previous_score = previous['score']['fullTime']
-            
-            # Prüfe auf Tor-Änderung
-            if (current_score['home'] != previous_score['home'] or 
-                current_score['away'] != previous_score['away']):
-                
-                score_text = f"{current_score['home']}:{current_score['away']}"
-                send_goal_notification(
-                    current['homeTeam']['name'],
-                    current['awayTeam']['name'],
-                    score_text
-                )
+        response = requests.get(url, headers=headers, timeout=10)
+        return response.json() if response.status_code == 200 else None
+    except:
+        return None
 
 def display_matches(matches_data):
-    """
-    Zeigt Live-Spiele und anstehende Spiele an
-    """
     if not matches_data or 'matches' not in matches_data:
-        st.error("❌ Keine Spieldaten verfügbar")
-        return []
+        st.write("Keine Daten")
+        return
     
     matches = matches_data['matches']
+    today = datetime.now().date()
     
-    # Filtere nur heutige und Live-Spiele
-    today_matches = []
-    live_matches = []
-    
+    found = False
     for match in matches:
-        status = match['status']
-        if status == 'IN_PLAY':
-            live_matches.append(match)
-        elif status in ['TIMED', 'SCHEDULED']:
-            match_date = datetime.strptime(match['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
-            if match_date.date() == datetime.now().date():
-                today_matches.append(match)
-    
-    # Live-Spiele anzeigen
-    if live_matches:
-        st.markdown("### 🔴 LIVE JETZT")
-        for match in live_matches:
-            score = match['score']['fullTime']
-            home_team = match['homeTeam']['name']
-            away_team = match['awayTeam']['name']
-            minute = match.get('minute', '?')
+        # Zeitzone: UTC + 1 Stunde (Anpassung für Deutschland/Winterzeit)
+        match_time_utc = datetime.strptime(match['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
+        match_time_local = match_time_utc + timedelta(hours=1) # Hier +1 Std Anpassung
+        
+        if match_time_local.date() == today or match['status'] == 'IN_PLAY':
+            found = True
+            home = match['homeTeam']['shortName'] or match['homeTeam']['name']
+            away = match['awayTeam']['shortName'] or match['awayTeam']['name']
             
+            status_html = ""
+            if match['status'] == 'IN_PLAY':
+                score = match['score']['fullTime']
+                status_html = f'<div class="score">{score["home"]}:{score["away"]}</div>'
+            else:
+                status_html = f'<div class="match-time">⏰ {match_time_local.strftime("%H:%M")}</div>'
+
             st.markdown(f"""
             <div class="match-card">
-                <span class="live-badge">LIVE {minute}'</span>
-                <div class="team-name">{home_team}</div>
-                <div class="score">{score['home']} : {score['away']}</div>
-                <div class="team-name">{away_team}</div>
+                <div class="team-name">{home}</div>
+                {status_html}
+                <div class="team-name">{away}</div>
             </div>
             """, unsafe_allow_html=True)
     
-    # Heutige Spiele anzeigen
-    if today_matches:
-        st.markdown("### 📅 Heute geplant")
-        for match in today_matches:
-            home_team = match['homeTeam']['name']
-            away_team = match['awayTeam']['name']
-            match_time = datetime.strptime(match['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
-            time_str = match_time.strftime('%H:%M')
-            
-            st.markdown(f"""
-            <div class="match-card" style="background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);">
-                <div style="text-align: center; color: #fbbf24; margin-bottom: 8px;">⏰ {time_str} Uhr</div>
-                <div class="team-name">{home_team}</div>
-                <div style="text-align: center; font-size: 20px; margin: 10px 0;">vs</div>
-                <div class="team-name">{away_team}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    if not live_matches and not today_matches:
-        st.info("ℹ️ Heute keine Live-Spiele oder anstehenden Spiele")
-    
-    return matches
+    if not found: st.info("Keine Spiele heute")
 
 def display_standings(standings_data):
-    """
-    Zeigt die Gruppentabelle an (ohne Pandas)
-    """
-    if not standings_data or 'standings' not in standings_data:
-        st.error("❌ Keine Tabellendaten verfügbar")
-        return
+    if not standings_data or 'standings' not in standings_data: return
+    table = standings_data['standings'][0]['table']
     
-    standings = standings_data['standings']
-    
-    if not standings:
-        st.info("ℹ️ Tabelle noch nicht verfügbar")
-        return
-    
-    # Nehme die erste Tabelle (Gesamttabelle)
-    table = standings[0]['table']
-    
-    # Erstelle HTML Tabelle
     html = """
-    <style>
-    .standings-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 11px;
-        background: white;
-        border-radius: 8px;
-        overflow: hidden;
-        color: black;
-    }
-    .standings-table th {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 8px 4px;
-        text-align: left;
-        font-weight: bold;
-    }
-    .standings-table td {
-        padding: 6px 4px;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    .standings-table tr:hover {
-        background: #f3f4f6;
-    }
-    .pos {
-        font-weight: bold;
-        color: #667eea;
-    }
-    </style>
-    <table class="standings-table">
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th>Team</th>
-            <th>Sp</th>
-            <th>S</th>
-            <th>U</th>
-            <th>N</th>
-            <th>Tore</th>
-            <th>Pkt</th>
+    <table style="width:100%; border-collapse:collapse; font-size:10px; color:white;">
+        <tr style="border-bottom: 1px solid #4a5568;">
+            <th>#</th><th>Team</th><th>P</th>
         </tr>
-    </thead>
-    <tbody>
     """
-    
     for entry in table:
-        team_name = entry['team']['name']
-        # Kürze lange Namen
-        if len(team_name) > 20:
-            team_name = team_name[:17] + "..."
-        
+        name = entry['team']['shortName'] or entry['team']['name']
+        if len(name) > 10: name = name[:9] + "."
         html += f"""
-        <tr>
-            <td class="pos">{entry['position']}</td>
-            <td>{team_name}</td>
-            <td>{entry['playedGames']}</td>
-            <td>{entry['won']}</td>
-            <td>{entry['draw']}</td>
-            <td>{entry['lost']}</td>
-            <td>{entry['goalsFor']}:{entry['goalsAgainst']}</td>
-            <td><strong>{entry['points']}</strong></td>
+        <tr style="border-bottom: 1px solid #2d3748;">
+            <td style="color:#667eea; font-weight:bold;">{entry['position']}</td>
+            <td>{name}</td>
+            <td style="text-align:center;">{entry['points']}</td>
         </tr>
         """
-    
-    html += """
-    </tbody>
-    </table>
-    """
-    
+    html += "</table>"
     st.markdown(html, unsafe_allow_html=True)
 
 # ============================================================================
-# HAUPTPROGRAMM
+# MAIN
 # ============================================================================
-
 def main():
-    # Seitenkonfiguration
-    st.set_page_config(
-        page_title="⚽ Champions League LIVE",
-        page_icon="⚽",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
-    
-    # Custom CSS laden
+    st.set_page_config(page_title="CL Live", layout="wide")
     load_custom_css()
     
-    # Header
-    st.markdown("# ⚽ Champions League LIVE")
-    st.markdown(f"*Letzte Aktualisierung: {datetime.now().strftime('%H:%M:%S')}*")
+    st.markdown("# ⚽ CL LIVE")
     
-    # Auto-Refresh alle 30 Sekunden
-    placeholder = st.empty()
+    col1, col2 = st.columns(2)
     
-    # Session State für vorherige Spielstände
-    if 'previous_matches' not in st.session_state:
-        st.session_state.previous_matches = None
+    matches_data = get_api_data(MATCHES_URL)
+    standings_data = get_api_data(STANDINGS_URL)
     
-    with placeholder.container():
-        # Daten laden
-        matches_data = get_api_data(MATCHES_URL)
-        standings_data = get_api_data(STANDINGS_URL)
+    with col1:
+        st.markdown("## 🏁 Spiele")
+        display_matches(matches_data)
         
-        if matches_data:
-            current_matches = matches_data.get('matches', [])
-            
-            # Prüfe auf Tore
-            check_for_goals(current_matches, st.session_state.previous_matches)
-            
-            # Speichere aktuelle Spielstände
-            st.session_state.previous_matches = current_matches
-        
-        # Split-Screen Layout
-        st.markdown('<div class="split-container">', unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown('<div class="split-column">', unsafe_allow_html=True)
-            st.markdown("## 🔥 Live-Spiele")
-            display_matches(matches_data)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown('<div class="split-column">', unsafe_allow_html=True)
-            st.markdown("## 📊 Tabelle")
-            display_standings(standings_data)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Auto-Refresh nach 30 Sekunden
+    with col2:
+        st.markdown("## 📊 Tabelle")
+        display_standings(standings_data)
+
     time.sleep(30)
     st.rerun()
 
