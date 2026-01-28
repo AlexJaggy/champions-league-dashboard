@@ -7,162 +7,116 @@ from datetime import datetime, timedelta
 # ============================================================================
 # KONFIGURATION
 # ============================================================================
-API_KEY = os.environ.get("FOOTBALL_API_KEY")
-if not API_KEY:
-    try:
-        API_KEY = st.secrets["FOOTBALL_API_KEY"]
-    except (FileNotFoundError, KeyError):
-        API_KEY = "c1714469c0374ef4819fc9375a27269f"
-
-NTFY_TOPIC = "champions-league-goals"
-
-# API Endpoints
+API_KEY = os.environ.get("FOOTBALL_API_KEY") or "c1714469c0374ef4819fc9375a27269f"
 MATCHES_URL = "https://api.football-data.org/v4/competitions/CL/matches"
 STANDINGS_URL = "https://api.football-data.org/v4/competitions/CL/standings"
 
 # ============================================================================
-# CUSTOM CSS FÜR S24 ULTRA (NEBENEINANDER ERZWINGEN)
+# CSS FÜR S24 ULTRA (ERZWINGT SIDE-BY-SIDE & FIXES HTML)
 # ============================================================================
 def load_custom_css():
     st.markdown("""
     <style>
-    /* Hauptcontainer für Handy optimieren */
-    .stApp { max-width: 100%; padding: 0.2rem; }
+    .stApp { max-width: 100%; padding: 0.1rem; background-color: #0e1117; }
     
-    /* Erzwingt nebeneinander Darstellung auch auf schmalen Bildschirmen */
+    /* Erzwingt nebeneinander Darstellung auf mobilen Browsern */
     [data-testid="column"] {
-        width: 49% !important;
-        flex: 1 1 49% !important;
-        min-width: 49% !important;
+        width: 50% !important;
+        flex: 1 1 50% !important;
+        min-width: 50% !important;
     }
     
     div[data-testid="stHorizontalBlock"] {
-        display: flex;
+        display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 5px;
     }
 
-    /* Match Cards kompakter */
     .match-card {
-        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-        border-radius: 8px;
-        padding: 8px;
-        margin-bottom: 6px;
-        color: white;
+        background: #1e293b;
+        border-radius: 6px;
+        padding: 6px;
+        margin-bottom: 4px;
         text-align: center;
-        border-left: 3px solid #667eea;
+        border-left: 2px solid #3b82f6;
     }
     
-    .team-name { font-size: 11px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .score { font-size: 18px; font-weight: bold; margin: 2px 0; color: #fbbf24; }
-    .match-time { font-size: 10px; color: #a0aec0; }
+    .team-name { font-size: 10px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score { font-size: 14px; font-weight: bold; color: #fbbf24; }
+    .match-time { font-size: 9px; color: #94a3b8; }
     
-    h1 { font-size: 18px !important; }
-    h2 { font-size: 14px !important; margin-bottom: 10px !important; }
-
-    /* UI Elemente verstecken */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    h1, h2 { font-size: 14px !important; margin: 5px 0 !important; color: white; }
+    #MainMenu, footer, header { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
 # ============================================================================
-# FUNKTIONEN
+# DATEN-FUNKTIONEN
 # ============================================================================
-
 def get_api_data(url):
-    headers = {"X-Auth-Token": API_KEY}
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        return response.json() if response.status_code == 200 else None
-    except:
-        return None
+        r = requests.get(url, headers={"X-Auth-Token": API_KEY}, timeout=10)
+        return r.json() if r.status_code == 200 else None
+    except: return None
 
-def display_matches(matches_data):
-    if not matches_data or 'matches' not in matches_data:
-        st.write("Keine Daten")
-        return
-    
-    matches = matches_data['matches']
+def display_matches(data):
+    if not data or 'matches' not in data: return
     today = datetime.now().date()
-    
-    found = False
-    for match in matches:
-        # Zeitzone: UTC + 1 Stunde (Anpassung für Deutschland/Winterzeit)
-        match_time_utc = datetime.strptime(match['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
-        match_time_local = match_time_utc + timedelta(hours=1) # Hier +1 Std Anpassung
+    for m in data['matches']:
+        # Korrektur der Zeitzone (UTC+1)
+        utc_time = datetime.strptime(m['utcDate'], '%Y-%m-%dT%H:%M:%SZ')
+        local_time = utc_time + timedelta(hours=1)
         
-        if match_time_local.date() == today or match['status'] == 'IN_PLAY':
-            found = True
-            home = match['homeTeam']['shortName'] or match['homeTeam']['name']
-            away = match['awayTeam']['shortName'] or match['awayTeam']['name']
+        if local_time.date() == today or m['status'] == 'IN_PLAY':
+            home = m['homeTeam']['shortName'] or m['homeTeam']['name'][:10]
+            away = m['awayTeam']['shortName'] or m['awayTeam']['name'][:10]
             
-            status_html = ""
-            if match['status'] == 'IN_PLAY':
-                score = match['score']['fullTime']
-                status_html = f'<div class="score">{score["home"]}:{score["away"]}</div>'
-            else:
-                status_html = f'<div class="match-time">⏰ {match_time_local.strftime("%H:%M")}</div>'
+            content = f'<div class="score">{m["score"]["fullTime"]["home"]}:{m["score"]["fullTime"]["away"]}</div>' if m['status'] == 'IN_PLAY' else f'<div class="match-time">⏰ {local_time.strftime("%H:%M")}</div>'
+            
+            st.markdown(f'<div class="match-card"><div class="team-name">{home}</div>{content}<div class="team-name">{away}</div></div>', unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div class="match-card">
-                <div class="team-name">{home}</div>
-                {status_html}
-                <div class="team-name">{away}</div>
-            </div>
-            """, unsafe_allow_html=True)
+def display_standings(data):
+    if not data or 'standings' not in data: return
+    table = data['standings'][0]['table']
     
-    if not found: st.info("Keine Spiele heute")
-
-def display_standings(standings_data):
-    if not standings_data or 'standings' not in standings_data: return
-    table = standings_data['standings'][0]['table']
+    # Komplette HTML-Tabelle als EIN String
+    html = '<table style="width:100%; border-collapse:collapse; font-size:9px; color:white;">'
+    html += '<tr style="border-bottom:1px solid #334155;"><th>#</th><th style="text-align:left;">Team</th><th>P</th></tr>'
     
-    html = """
-    <table style="width:100%; border-collapse:collapse; font-size:10px; color:white;">
-        <tr style="border-bottom: 1px solid #4a5568;">
-            <th>#</th><th>Team</th><th>P</th>
-        </tr>
-    """
-    for entry in table:
-        name = entry['team']['shortName'] or entry['team']['name']
-        if len(name) > 10: name = name[:9] + "."
-        html += f"""
-        <tr style="border-bottom: 1px solid #2d3748;">
-            <td style="color:#667eea; font-weight:bold;">{entry['position']}</td>
-            <td>{name}</td>
-            <td style="text-align:center;">{entry['points']}</td>
-        </tr>
-        """
-    html += "</table>"
+    for e in table:
+        name = e['team']['shortName'] or e['team']['name']
+        name = (name[:8] + '..') if len(name) > 9 else name
+        html += f'<tr style="border-bottom:1px solid #1e293b;"><td style="color:#3b82f6;">{e["position"]}</td><td>{name}</td><td style="text-align:center;">{e["points"]}</td></tr>'
+    
+    html += '</table>'
+    # Dieser Aufruf rendert das HTML korrekt
     st.markdown(html, unsafe_allow_html=True)
 
 # ============================================================================
-# MAIN
+# MAIN APP
 # ============================================================================
 def main():
-    st.set_page_config(page_title="CL Live", layout="wide")
+    st.set_page_config(page_title="CL", layout="wide")
     load_custom_css()
     
-    st.markdown("# ⚽ CL LIVE")
+    st.markdown("## ⚽ CL LIVE (UTC+1)")
+    
+    m_data = get_api_data(MATCHES_URL)
+    s_data = get_api_data(STANDINGS_URL)
     
     col1, col2 = st.columns(2)
     
-    matches_data = get_api_data(MATCHES_URL)
-    standings_data = get_api_data(STANDINGS_URL)
-    
     with col1:
         st.markdown("## 🏁 Spiele")
-        display_matches(matches_data)
+        display_matches(m_data)
         
     with col2:
         st.markdown("## 📊 Tabelle")
-        display_standings(standings_data)
+        display_standings(s_data)
 
     time.sleep(30)
     st.rerun()
 
 if __name__ == "__main__":
     main()
+    
