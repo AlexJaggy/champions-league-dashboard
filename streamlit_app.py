@@ -1,12 +1,25 @@
 import streamlit as st
 import requests
 import time
+import os  # <--- NEU: Wichtig für Render Environment Variables
 from datetime import datetime
 
 # ============================================================================
-# KONFIGURATION - Hier musst du später deinen API-Key eintragen!
+# KONFIGURATION
 # ============================================================================
-API_KEY = st.secrets.get("FOOTBALL_API_KEY", "c1714469c0374ef4819fc9375a27269f")
+
+# 1. Versuche Key aus Render Environment Variables zu laden
+API_KEY = os.environ.get("FOOTBALL_API_KEY")
+
+# 2. Falls nicht vorhanden (z.B. lokal), versuche st.secrets oder Fallback
+if not API_KEY:
+    try:
+        # Versuche secrets.toml (für lokale Entwicklung)
+        API_KEY = st.secrets["FOOTBALL_API_KEY"]
+    except (FileNotFoundError, KeyError):
+        # Letzter Ausweg: Der Hardcoded Key aus deinem Original-Code
+        API_KEY = "c1714469c0374ef4819fc9375a27269f"
+
 NTFY_TOPIC = "champions-league-goals"  # Du kannst das ändern!
 
 # API Endpoints
@@ -275,6 +288,7 @@ def display_standings(standings_data):
         background: white;
         border-radius: 8px;
         overflow: hidden;
+        color: black;
     }
     .standings-table th {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
