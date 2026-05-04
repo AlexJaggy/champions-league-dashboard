@@ -7,7 +7,10 @@ from datetime import datetime, timedelta
 # ============================================================================
 # KONFIGURATION
 # ============================================================================
-API_KEY = os.environ.get("FOOTBALL_API_KEY") or "c1714469c0374ef4819fc9375a27269f"
+API_KEY = os.environ.get("FOOTBALL_API_KEY")
+if not API_KEY:
+    st.error("API Key fehlt – bitte FOOTBALL_API_KEY als Umgebungsvariable setzen.")
+    st.stop()
 MATCHES_URL = "https://api.football-data.org/v4/competitions/CL/matches"
 STANDINGS_URL = "https://api.football-data.org/v4/competitions/CL/standings"
 
